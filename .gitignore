@@ -1,0 +1,9 @@
+# ai-team 実行時領域(タスク引き継ぎ・gate 記録・レポート)と worktree
+/.ai-team/
+/.worktrees/
+.claude/settings.local.json
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.*
