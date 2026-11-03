@@ -1,0 +1,27 @@
+name: 質問
+description: アシスタントに日常・業務の質問をする(このリポジトリは公開です。個人情報や秘密情報は書かないでください)
+title: "Q: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **このリポジトリは公開されています。** 質問も回答も誰でも読めます。氏名・住所・社内情報・パスワード等は書かないでください。
+  - type: textarea
+    id: question
+    attributes:
+      label: 質問
+      description: 何を知りたいか。背景や条件(期限・予算・場所など)があれば一緒に。
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: 回答の形
+      options:
+        - おまかせ
+        - 3 行で要点だけ
+        - 手順・チェックリスト
+        - 比較表
+    validations:
+      required: false

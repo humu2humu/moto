@@ -1,0 +1,81 @@
+# 毎日の質問に答えるアシスタント
+#
+# 使い方: Issue に `question` ラベルを付けて質問を書く(テンプレート「質問」を使うと自動で付く)。
+#         同じ Issue にコメントすると追加質問として回答する。
+#
+# 安全設計:
+#   - リポジトリ所有者の操作だけで起動する(公開リポジトリでの第三者による API 課金・プロンプト注入を防ぐ)
+#   - Claude に与えるのは Web 検索・閲覧・Issue の閲覧と、回答ファイルの書き込みだけ。コードの変更・push はできない
+#   - 回答の投稿は Claude ではなく後続のステップが行う(投稿先・内容の経路を固定)
+#
+# 必要な設定: Settings → Secrets and variables → Actions に ANTHROPIC_API_KEY
+#             (Claude のサブスクリプションを使う場合は CLAUDE_CODE_OAUTH_TOKEN。下の with を差し替える)
+name: daily-assistant
+
+on:
+  issues:
+    types: [opened, labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: daily-assistant-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  answer:
+    # 所有者本人の操作 / PR ではない / question ラベル付き / ラベル追加イベントは question の時だけ
+    if: >-
+      github.event.sender.login == github.repository_owner &&
+      !github.event.issue.pull_request &&
+      contains(github.event.issue.labels.*.name, 'question') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'question')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Ask Claude
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            リポジトリ ${{ github.repository }} の Issue #${{ github.event.issue.number }} に、所有者から質問が届きました。
+            まず `gh issue view ${{ github.event.issue.number }} --repo ${{ github.repository }} --comments` で
+            本文とこれまでのやり取りをすべて読み、最新の質問(最後の所有者コメント、なければ本文)に答えてください。
+
+            回答は Markdown で、ファイル `${{ runner.temp }}/answer.md` に Write ツールで書き出してください。
+            それ以外のファイルは作らず、コメントの投稿もしないでください(投稿は後続ステップが行います)。
+          claude_args: |
+            --model claude-sonnet-5-5
+            --max-turns 12
+            --allowedTools "WebSearch,WebFetch,Write,Bash(gh issue view:*)"
+            --disallowedTools "Edit,MultiEdit,NotebookEdit"
+            --append-system-prompt "あなたは所有者専用の日常・業務アシスタントです。日本語で、結論を先に、簡潔に答えてください。時事・価格・制度など変わりうる情報は Web で確認し、根拠の URL と確認日を添えてください。確信が持てない点は推測と明記し、作り話をしないでください。医療・法律・税務・投資は一般的な情報にとどめ、専門家への相談を勧めてください。この Issue は公開されているため、回答に個人情報・秘密情報を含めず、質問にそれらが含まれていたら冒頭で注意喚起してください。回答の最後に『_🤖 Claude による自動回答。誤りがあり得るため重要な判断の前に確認してください。_』と書いてください。"
+
+      - name: Post answer
+        if: always() && steps.claude.outcome != 'skipped'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANSWER_FILE: ${{ runner.temp }}/answer.md  # runner コンテキストはステップ単位でのみ使える
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -s "$ANSWER_FILE" ]; then
+            gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$ANSWER_FILE"
+          else
+            gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+              --body "⚠️ 回答を生成できませんでした。実行ログ: $RUN_URL"
+            exit 1
+          fi
