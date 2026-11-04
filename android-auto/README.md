@@ -47,7 +47,7 @@ gradle -p android-auto/core test
 
 ## 検証状況
 
-- `core` の単体テストは `gradle -p android-auto/core test` で実行する(作成時点の実行結果はコミット履歴を参照)。
+- `core` の単体テスト: 作成時に `gradle -p android-auto/core test`(Gradle 8.14.3 / JDK 21)で 13 件すべて成功。
 - `app` は、作成した環境から Google Maven(`dl.google.com`)へ接続できなかったため、**ビルド未確認**。
   使用している Car App Library の API は androidx のソースで存在とシグネチャを確認したが、
   初回は Android Studio でビルドし、DHU で動作確認すること。
