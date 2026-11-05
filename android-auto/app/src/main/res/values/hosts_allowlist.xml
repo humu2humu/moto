@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      リリースビルドで接続を許可するホスト(Android Auto など)。
+      各要素は "パッケージ名,署名証明書の SHA-256 ダイジェスト" 形式。
+      空のままだとリリースビルドはどのホストからも接続を拒否する(安全側の既定)。
+      値は Car App Library のドキュメント / サンプルの hosts_allowlist を参照して設定すること。
+    -->
+    <string-array name="hosts_allowlist" />
+</resources>
